@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import Thread from "../models/thread.model";
 import User from "../models/user.model";
 import { connectToDB } from "../mongoose";
+import { string } from "zod";
 
 interface Params {
   text: string;
@@ -103,5 +104,36 @@ export async function fetchThreadById(id: string) {
       return thread;
   } catch (e: any) {
     throw new Error(`Failed fetch thread: ${e.message}`);
+  }
+}
+
+export async function addCommentToThread(
+  threadId: string,
+  commentText: string,
+  userId: string,
+  path: string
+) {
+  try {
+    connectToDB();
+    const originalThread = await Thread.findById(threadId);
+    if(!originalThread) {
+      throw new Error("Thread not found");
+    }
+    const commentThread = new Thread({
+      text: commentText,
+      author: userId,
+      parentId: threadId
+    });
+
+    const saveCommentThread = await commentThread.save();
+
+    originalThread.children.push(saveCommentThread._id);
+
+    await originalThread.save();
+
+    revalidatePath(path);
+
+  } catch(e: any) {
+    throw new Error(`Failed to add comment to thread: ${e.message}`);
   }
 }
